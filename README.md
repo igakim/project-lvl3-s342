@@ -5,6 +5,7 @@
 [![Build Status](https://travis-ci.com/igakim/project-lvl3-s342.svg?branch=master)](https://travis-ci.com/igakim/project-lvl3-s342)
 
 # RSS Reader
+Реализация третьего проекта в рамках обучения на [Хекслете](https://hexlet.io/) 
 
 ## Link to website: 
 [igakim-rss.surge.sh](http://igakim-rss.surge.sh/)
