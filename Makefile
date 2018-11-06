@@ -1,8 +1,11 @@
 install:
 	npm install
 
-webpack:
+build:
 	npm run webpack
 
 lint:
 	npm run eslint
+
+dev:
+	npm run dev
