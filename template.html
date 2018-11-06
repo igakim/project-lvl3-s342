@@ -3,18 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <title>RSS READER</title>
+  <style>
+    .loader {
+      position: fixed;
+      z-index: 999;
+      background-color: rgba(0, 0, 0, .7);
+      width: 100%;
+      height: 100%;
+      display: -webkit-flex;
+      display: -moz-flex;
+      display: -ms-flex;
+      display: -o-flex;
+      display: flex;
+      justify-content: center;
+      -ms-align-items: center;
+      align-items: center;
+    }
+    .loader.loaded {
+      display: none;
+    }
+    .loader .fa-spinner {
+      font-size: 70px;
+      color: #fff;
+    }
+    .error {
+      font-size: 24px;
+      color: #f00;
+    }
+  </style>
 </head>
 <body>
-  <div class="wrapper">
-    <div class="jumbotron">
-      <h1 class="display-4">RSS Reader</h1>
-      <form action="">
-        <div class="form-group">
-          <label for="search-field">Enter ur query</label>
-          <input type="text" class="form-control" id="search-field" aria-describedby="search" placeholder="Search">
+  <div class="loader loaded">
+    <i class="fas fa-spinner fa-spin"></i>
+  </div>
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+         <div class="jumbotron">
+            <h1 class="display-4">RSS Reader</h1>
+            <form>
+              <div class="form-group">
+                <label for="search-field">Enter RSS address (URL). For example: https://sample.net/rss/feed</label>
+                <input type="text" class="form-control" id="search-field" aria-describedby="search" placeholder="Search">
+                <div class="invalid-feedback"> 
+                  Wrong URL or already exists
+                </div>
+              </div>
+              <button type="submit" class="btn btn-success disabled" disabled="disabled">Send</button>
+            </form>
+            <div class="error"></div>
+          </div>
         </div>
-        <button type="submit" class="btn btn-success">Send</button>
-      </form>
+    </div>
+    <div class="row">
+      <div class="col-12">
+        <div class="rss-feed"></div>
+      </div>
     </div>
   </div>
 </body>
