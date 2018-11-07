@@ -1,6 +1,10 @@
 import axios from 'axios';
 import WatchJS from 'melanke-watchjs';
 import validator from 'validator';
+import $ from 'jquery';
+import _ from 'lodash';
+import parse from './parse';
+import getArticleDescription from './util';
 
 const { watch } = WatchJS;
 
@@ -11,14 +15,16 @@ export default () => {
       submitDisabled: true,
       hasFeed: false,
     },
-    response: {
+    responses: [],
+    error: {
       title: null,
-      description: null,
-      items: [],
-      hasError: false,
-      errors: [],
+      errorDescription: null,
     },
     feeds: [],
+    modal: {
+      description: null,
+      link: null,
+    },
     loader: {
       loaded: true,
     },
@@ -26,11 +32,12 @@ export default () => {
 
   const input = document.querySelector('#search-field');
   const submitButton = document.querySelector('button[type=submit]');
-  const rssContainer = document.querySelector('.rss-feed');
-  const parser = new DOMParser();
+  const rssContainer = document.querySelector('.rss-feeds-container');
   const proxy = 'https://cors.io/?';
   const errorContainer = document.querySelector('.error');
   const loader = document.querySelector('.loader');
+  const modalBody = document.querySelector('.modal-body');
+  const modalFooter = document.querySelector('.modal-footer');
 
   submitButton.addEventListener('click', (e) => {
     e.preventDefault();
@@ -40,35 +47,15 @@ export default () => {
     state.validate.hasFeed = false;
     state.loader.loaded = false;
 
-    axios.get(`${proxy}${state.feeds[state.feeds.length - 1]}`)
-      .then((res) => {
-        const doc = parser.parseFromString(res.data, 'application/xml');
-        state.response = {
-          title: doc.querySelector('title').textContent,
-          description: doc.querySelector('description').textContent,
-          items: [...doc.getElementsByTagName('item')],
-          hasError: false,
-          errors: state.response.errors,
-        };
+    axios.get(`${proxy}${input.value}`)
+      .then((response) => {
+        state.responses.push(parse(response.data));
         state.loader.loaded = true;
       })
-      .catch((error) => {
-        let description = '';
-        if (error.response) {
-          description = `${error.response.status} ${error.response.statusText}`;
-        } else if (error.request) {
-          description = 'The request was made but no response was received';
-        } else {
-          description = 'Something happened in setting up the request that triggered an Error';
-        }
-        state.response = {
-          title: 'Couldn\'t load RSS feed!',
-          description,
-          items: state.response.items,
-          hasError: true,
-          errors: state.response.errors.concat(error),
-        };
+      .catch((err) => {
+        state.error = parse(null, err);
         state.loader.loaded = true;
+        console.log(state.error);
       });
   });
 
@@ -86,6 +73,11 @@ export default () => {
       state.validate.submitDisabled = true;
       state.validate.hasFeed = false;
     }
+  });
+
+  $('.rss-feeds-container').on('click', 'button.btn-primary', (e) => {
+    state.modal.description = getArticleDescription(e.target, state);
+    state.modal.link = e.target.dataset.itemLink;
   });
 
   watch(state, 'validate', () => {
@@ -106,29 +98,45 @@ export default () => {
     }
   });
 
-  watch(state, 'response', () => {
-    if (state.response.hasError) {
-      errorContainer.innerHTML = `
-        <p>${state.response.title}</p>
-        <p>${state.response.description}</p>
-      `;
-      return;
-    }
+  watch(state, 'responses', () => {
+    rssContainer.innerHTML = '';
     errorContainer.innerHTML = '';
     input.value = '';
-    const html = `
-      <h2 class="text-center">${state.response.title}</h2>
-      <p class="text-center">${state.response.description}</p>
-      <ul>
-        ${state.response.items.map(el => `
-          <li>
-            <a href="${el.querySelector('link').textContent}">
-              ${el.querySelector('title').textContent}
-            </a>
-          </li>`).join('')}
-      </ul>
+    state.responses.forEach((rss) => {
+      const div = document.createElement('div');
+      div.classList.add('rss-feed');
+      const html = `
+        <h2 class="text-center">${rss.title}</h2>
+        <p class="text-center">${rss.chanelDescription}</p>
+        <ul class="list-group list-group-flush">
+          ${rss.items.map(el => `
+            <li class="list-group-item">
+              <a href="${el.link}">
+                ${el.title}
+              </a>
+              <button class="btn btn-primary float-right" data-toggle="modal" data-target="#exampleModal" data-feed-name="${rss.title}" data-item-link="${el.link}">
+                Description
+              </button>
+            </li>
+          `).join('')}
+        <ul>
+      `;
+      div.innerHTML = html;
+      rssContainer.prepend(div);
+    });
+  });
+
+  watch(state, 'error', () => {
+    errorContainer.innerHTML = `
+      <p>${state.error.title}</p>
+      <p>${state.error.errorDescription}</p>
     `;
-    rssContainer.innerHTML = `${html}${rssContainer.innerHTML}`;
+  });
+
+  watch(state, 'modal', () => {
+    modalBody.innerHTML = state.modal.description;
+    const linkElement = `<a href="${state.modal.link}" class="btn btn-primary" target="_blank">Читать на сайте</a>`;
+    modalFooter.innerHTML = linkElement;
   });
 
   watch(state, 'loader', () => {
