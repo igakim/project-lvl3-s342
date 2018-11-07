@@ -11,20 +11,65 @@ export default () => {
       submitDisabled: true,
       hasFeed: false,
     },
+    response: {
+      title: null,
+      description: null,
+      items: [],
+      hasError: false,
+      errors: [],
+    },
     feeds: [],
+    loader: {
+      loaded: true,
+    },
   };
 
   const input = document.querySelector('#search-field');
   const submitButton = document.querySelector('button[type=submit]');
   const rssContainer = document.querySelector('.rss-feed');
+  const parser = new DOMParser();
+  const proxy = 'https://cors.io/?';
+  const errorContainer = document.querySelector('.error');
+  const loader = document.querySelector('.loader');
 
   submitButton.addEventListener('click', (e) => {
     e.preventDefault();
     state.feeds.push(input.value);
-    input.value = '';
     state.validate.valid = true;
     state.validate.submitDisabled = true;
     state.validate.hasFeed = false;
+    state.loader.loaded = false;
+
+    axios.get(`${proxy}${state.feeds[state.feeds.length - 1]}`)
+      .then((res) => {
+        const doc = parser.parseFromString(res.data, 'application/xml');
+        state.response = {
+          title: doc.querySelector('title').textContent,
+          description: doc.querySelector('description').textContent,
+          items: [...doc.getElementsByTagName('item')],
+          hasError: false,
+          errors: state.response.errors,
+        };
+        state.loader.loaded = true;
+      })
+      .catch((error) => {
+        let description = '';
+        if (error.response) {
+          description = `${error.response.status} ${error.response.statusText}`;
+        } else if (error.request) {
+          description = 'The request was made but no response was received';
+        } else {
+          description = 'Something happened in setting up the request that triggered an Error';
+        }
+        state.response = {
+          title: 'Couldn\'t load RSS feed!',
+          description,
+          items: state.response.items,
+          hasError: true,
+          errors: state.response.errors.concat(error),
+        };
+        state.loader.loaded = true;
+      });
   });
 
   input.addEventListener('input', () => {
@@ -61,55 +106,36 @@ export default () => {
     }
   });
 
-  const parser = new DOMParser();
-  const proxy = 'https://cors.io/?';
-  const errorContainer = document.querySelector('.error');
-  const loader = document.querySelector('.loader');
-
-  watch(state, 'feeds', () => {
+  watch(state, 'response', () => {
+    if (state.response.hasError) {
+      errorContainer.innerHTML = `
+        <p>${state.response.title}</p>
+        <p>${state.response.description}</p>
+      `;
+      return;
+    }
     errorContainer.innerHTML = '';
+    input.value = '';
+    const html = `
+      <h2 class="text-center">${state.response.title}</h2>
+      <p class="text-center">${state.response.description}</p>
+      <ul>
+        ${state.response.items.map(el => `
+          <li>
+            <a href="${el.querySelector('link').textContent}">
+              ${el.querySelector('title').textContent}
+            </a>
+          </li>`).join('')}
+      </ul>
+    `;
+    rssContainer.innerHTML = `${html}${rssContainer.innerHTML}`;
+  });
 
-    loader.classList.remove('loaded');
-
-    axios.get(`${proxy}${state.feeds[state.feeds.length - 1]}`)
-      .then((res) => {
-        loader.classList.add('loaded');
-        const doc = parser.parseFromString(res.data, 'application/xml');
-        const title = doc.querySelector('title').textContent;
-        const description = doc.querySelector('description').textContent;
-        const items = [...doc.getElementsByTagName('item')];
-        const html = `
-          <h2 class="text-center">${title}</h2>
-          <p class="text-center">${description}</p>
-          <ul>
-            ${items.map(el => `
-              <li>
-                <a href="${el.querySelector('link').textContent}">
-                  ${el.querySelector('title').textContent}
-                </a>
-              </li>`).join('')}
-          </ul>
-        `;
-        rssContainer.innerHTML = `${html}${rssContainer.innerHTML}`;
-      })
-      .catch((error) => {
-        loader.classList.add('loaded');
-        if (error.response) {
-          errorContainer.innerHTML = `
-            <p>Couldn't load RSS feed!</p>
-            <p>${error.response.status} ${error.response.statusText}</p>
-          `;
-        } else if (error.request) {
-          errorContainer.innerHTML = `
-            <p>Couldn't load RSS feed!</p>
-            <p>The request was made but no response was received</p>
-          `;
-        } else {
-          errorContainer.innerHTML = `
-            <p>Couldn't load RSS feed!</p>
-            <p>Something happened in setting up the request that triggered an Error</p>
-          `;
-        }
-      });
+  watch(state, 'loader', () => {
+    if (state.loader.loaded) {
+      loader.classList.add('loaded');
+    } else {
+      loader.classList.remove('loaded');
+    }
   });
 };
