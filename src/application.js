@@ -2,8 +2,9 @@ import axios from 'axios';
 import WatchJS from 'melanke-watchjs';
 import validator from 'validator';
 import $ from 'jquery';
-import { responseParse, errorParse } from './parse';
-import getArticleDescription from './util';
+import _ from 'lodash';
+import parse from './parse';
+import { getArticleDescription, getError } from './util';
 
 const { watch } = WatchJS;
 
@@ -38,6 +39,26 @@ export default () => {
   const modalBody = document.querySelector('.modal-body');
   const modalFooter = document.querySelector('.modal-footer');
 
+  const timer = () => {
+    const allFeeds = state.feeds;
+    allFeeds.forEach((address) => {
+      axios.get(`${proxy}${address}`)
+        .then((response) => {
+          const { title, items } = parse(response.data);
+          const actualFeedIndex = state.responses.findIndex(el => el.title === title);
+          const oldItems = state.responses[actualFeedIndex].items;
+          const newItems = _.unionWith(oldItems, items, _.isEqual);
+          if (!_.isEqualWith(newItems, oldItems, (e1, e2) => _.isEqual(e1, e2))) {
+            state.responses[actualFeedIndex].items = newItems;
+          }
+        })
+        .catch((err) => {
+          state.error = getError(err);
+        });
+    });
+    setTimeout(timer, 5000);
+  };
+
   submitButton.addEventListener('click', (e) => {
     e.preventDefault();
     state.feeds.push(input.value);
@@ -48,14 +69,14 @@ export default () => {
 
     axios.get(`${proxy}${input.value}`)
       .then((response) => {
-        state.responses.push(responseParse(response.data));
+        state.responses.push(parse(response.data));
         state.loader.loaded = true;
       })
       .catch((err) => {
-        state.error = errorParse(err);
+        state.error = getError(err);
         state.loader.loaded = true;
-        console.log(state.error);
       });
+    timer();
   });
 
   input.addEventListener('input', () => {
