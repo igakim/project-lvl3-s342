@@ -2,8 +2,7 @@ import axios from 'axios';
 import WatchJS from 'melanke-watchjs';
 import validator from 'validator';
 import $ from 'jquery';
-import _ from 'lodash';
-import parse from './parse';
+import { responseParse, errorParse } from './parse';
 import getArticleDescription from './util';
 
 const { watch } = WatchJS;
@@ -49,11 +48,11 @@ export default () => {
 
     axios.get(`${proxy}${input.value}`)
       .then((response) => {
-        state.responses.push(parse(response.data));
+        state.responses.push(responseParse(response.data));
         state.loader.loaded = true;
       })
       .catch((err) => {
-        state.error = parse(null, err);
+        state.error = errorParse(err);
         state.loader.loaded = true;
         console.log(state.error);
       });
@@ -111,7 +110,7 @@ export default () => {
         <ul class="list-group list-group-flush">
           ${rss.items.map(el => `
             <li class="list-group-item">
-              <a href="${el.link}">
+              <a href="${el.link}" target="_blank">
                 ${el.title}
               </a>
               <button class="btn btn-primary float-right" data-toggle="modal" data-target="#exampleModal" data-feed-name="${rss.title}" data-item-link="${el.link}">
