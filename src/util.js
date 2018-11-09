@@ -1,10 +1,9 @@
-import _ from 'lodash';
 
 const getArticleDescription = (target, state) => {
   const { feedName } = target.dataset;
   const articleLink = target.dataset.itemLink;
-  const actualFeed = _.find(state.responses, { title: feedName });
-  const { description } = _.find(actualFeed.items, { link: articleLink });
+  const actualFeed = state.responses.find(e => e.title === feedName);
+  const { description } = actualFeed.items.find(e => e.link === articleLink);
   return description;
 };
 
