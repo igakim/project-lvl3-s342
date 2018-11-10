@@ -21,6 +21,8 @@ export default () => {
       errorDescription: null,
     },
     feeds: [],
+    wrongFeeds: [],
+    refreshFeed: false,
     modal: {
       description: null,
       link: null,
@@ -40,28 +42,25 @@ export default () => {
   const modalFooter = document.querySelector('.modal-footer');
 
   const timer = () => {
-    const allFeeds = state.feeds;
-    allFeeds.forEach((address) => {
-      axios.get(`${proxy}${address}`)
-        .then((response) => {
-          const { title, items } = parse(response.data);
-          const actualFeedIndex = state.responses.findIndex(el => el.title === title);
-          const oldItems = state.responses[actualFeedIndex].items;
-          const newItems = _.unionWith(oldItems, items, _.isEqual);
-          if (!_.isEqualWith(newItems, oldItems, (e1, e2) => _.isEqual(e1, e2))) {
-            state.responses[actualFeedIndex].items = newItems;
-          }
-        })
-        .catch((err) => {
-          state.error = getError(err);
-        });
+    const promises = state.feeds.map((address) => {
+      return axios.get(`${proxy}${address}`);
     });
-    setTimeout(timer, 5000);
+    Promise.all(promises).then((responses) => {
+      responses.forEach((res) => {
+        const { title, items } = parse(res.data);
+        const actualFeedIndex = state.responses.findIndex(el => el.title === title);
+        const oldItems = state.responses[actualFeedIndex].items;
+        const newItems = _.unionWith(oldItems, items, _.isEqual);
+        if (!_.isEqualWith(newItems, oldItems, (e1, e2) => _.isEqual(e1, e2))) {
+          state.responses[actualFeedIndex].items = newItems;
+        }
+      });
+      setTimeout(timer, 5000);
+    });
   };
 
   submitButton.addEventListener('click', (e) => {
     e.preventDefault();
-    state.feeds.push(input.value);
     state.validate.valid = true;
     state.validate.submitDisabled = true;
     state.validate.hasFeed = false;
@@ -69,14 +68,16 @@ export default () => {
 
     axios.get(`${proxy}${input.value}`)
       .then((response) => {
+        state.feeds.push(input.value);
+        state.refreshFeed = true;
         state.responses.push(parse(response.data));
         state.loader.loaded = true;
       })
       .catch((err) => {
+        state.wrongFeeds.push(input.value);
         state.error = getError(err);
         state.loader.loaded = true;
       });
-    timer();
   });
 
   input.addEventListener('input', () => {
@@ -87,7 +88,8 @@ export default () => {
     } else if (validator.isURL(input.value)) {
       state.validate.valid = true;
       state.validate.submitDisabled = false;
-      state.validate.hasFeed = state.feeds.includes(input.value);
+      state.validate.hasFeed = state.feeds.includes(input.value)
+                                 || state.wrongFeeds.includes(input.value);
     } else {
       state.validate.valid = false;
       state.validate.submitDisabled = true;
@@ -118,10 +120,14 @@ export default () => {
     }
   });
 
-  watch(state, 'responses', () => {
+  watch(state, 'responses', (prop) => {
+    // Эта проверка очень хрупкая? Или ОК?
+    // Пока ничего лучше не придумал.
+    if (prop !== 'items') {
+      input.value = '';
+      errorContainer.innerHTML = '';
+    }
     rssContainer.innerHTML = '';
-    errorContainer.innerHTML = '';
-    input.value = '';
     state.responses.forEach((rss) => {
       const div = document.createElement('div');
       div.classList.add('rss-feed');
@@ -144,6 +150,10 @@ export default () => {
       div.innerHTML = html;
       rssContainer.prepend(div);
     });
+  });
+
+  watch(state, 'refreshFeed', () => {
+    timer();
   });
 
   watch(state, 'error', () => {
