@@ -15,14 +15,15 @@ export default () => {
       submitDisabled: true,
       hasFeed: false,
     },
-    responses: [],
+    feeds: [],
     error: {
       title: null,
       errorDescription: null,
     },
-    feeds: [],
-    wrongFeeds: [],
+    links: [],
+    wrongLinks: [],
     refreshFeed: false,
+    clear: false,
     modal: {
       description: null,
       link: null,
@@ -42,17 +43,17 @@ export default () => {
   const modalFooter = document.querySelector('.modal-footer');
 
   const timer = () => {
-    const promises = state.feeds.map((address) => {
+    const promises = state.links.map((address) => {
       return axios.get(`${proxy}${address}`);
     });
     Promise.all(promises).then((responses) => {
       responses.forEach((res) => {
         const { title, items } = parse(res.data);
-        const actualFeedIndex = state.responses.findIndex(el => el.title === title);
-        const oldItems = state.responses[actualFeedIndex].items;
+        const actualFeedIndex = state.feeds.findIndex(el => el.title === title);
+        const oldItems = state.feeds[actualFeedIndex].items;
         const newItems = _.unionWith(oldItems, items, _.isEqual);
         if (!_.isEqualWith(newItems, oldItems, (e1, e2) => _.isEqual(e1, e2))) {
-          state.responses[actualFeedIndex].items = newItems;
+          state.feeds[actualFeedIndex].items = newItems;
         }
       });
       setTimeout(timer, 5000);
@@ -68,15 +69,17 @@ export default () => {
 
     axios.get(`${proxy}${input.value}`)
       .then((response) => {
-        state.feeds.push(input.value);
+        state.links.push(input.value);
         state.refreshFeed = true;
-        state.responses.push(parse(response.data));
+        state.feeds.push(parse(response.data));
         state.loader.loaded = true;
+        state.clear = true;
       })
       .catch((err) => {
-        state.wrongFeeds.push(input.value);
+        state.wrongLinks.push(input.value);
         state.error = getError(err);
         state.loader.loaded = true;
+        state.clear = false;
       });
   });
 
@@ -88,8 +91,8 @@ export default () => {
     } else if (validator.isURL(input.value)) {
       state.validate.valid = true;
       state.validate.submitDisabled = false;
-      state.validate.hasFeed = state.feeds.includes(input.value)
-                                 || state.wrongFeeds.includes(input.value);
+      state.validate.hasFeed = state.links.includes(input.value)
+                                 || state.wrongLinks.includes(input.value);
     } else {
       state.validate.valid = false;
       state.validate.submitDisabled = true;
@@ -120,15 +123,16 @@ export default () => {
     }
   });
 
-  watch(state, 'responses', (prop) => {
-    // Эта проверка очень хрупкая? Или ОК?
-    // Пока ничего лучше не придумал.
-    if (prop !== 'items') {
+  watch(state, 'clear', () => {
+    if (state.clear) {
       input.value = '';
       errorContainer.innerHTML = '';
     }
+  });
+
+  watch(state, 'feeds', () => {
     rssContainer.innerHTML = '';
-    state.responses.forEach((rss) => {
+    state.feeds.forEach((rss) => {
       const div = document.createElement('div');
       div.classList.add('rss-feed');
       const html = `
@@ -153,7 +157,7 @@ export default () => {
   });
 
   watch(state, 'refreshFeed', () => {
-    timer();
+    setTimeout(timer, 5000);
   });
 
   watch(state, 'error', () => {
