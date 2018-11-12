@@ -43,9 +43,7 @@ export default () => {
   const modalFooter = document.querySelector('.modal-footer');
 
   const timer = () => {
-    const promises = state.links.map((address) => {
-      return axios.get(`${proxy}${address}`);
-    });
+    const promises = state.links.map(address => axios.get(`${proxy}${address}`));
     Promise.all(promises).then((responses) => {
       responses.forEach((res) => {
         const { title, items } = parse(res.data);
